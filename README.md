@@ -17,3 +17,9 @@ Just clone, and open cvijs.html If you are using chrome, you must use ctrl-[ rat
 
 You can also watch it in action at http://www.youtube.com/watch?v=WiTWdyblAfI
 
+Contact
+=======
+
+@acouturebeil
+http://mofo.ca
+
