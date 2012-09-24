@@ -83,6 +83,9 @@ var tags = new Array();
 var palette;
 var cursor;
 
+//ACB
+var othercursors;
+
 var yank_buffer = undefined;
 
 var term_save_h = new Array();
@@ -498,6 +501,9 @@ function _dosuggest(z) {
 	sg.style.padding = '2px';
 	sg.style.textAlign = 'center';
 	sg.style.cursor = 'default';
+
+	//ACB
+	sg.style.othercursors = 'default';
 
 	var sa = suggestions[xt];
 	var i;
@@ -2086,6 +2092,8 @@ function _calcy(zx, x, g) {
 			cursor.removeChild(cursor.firstChild);
 		cursor.appendChild(document.createTextNode(z));
 
+		//ACB heres wher cursor contents change
+
 		cursor._lastch = z;
 		cursor._lastgh = q;
 
@@ -3174,6 +3182,11 @@ function term_draw_cursor(tf) {
 		cursor.style.color = palette[0];
 		cursor.style.backgroundColor = palette[1];
 	}
+
+	//ACB
+	othercursors._opaque = true;
+	othercursors.style.color = palette[1];
+	othercursors.style.backgroundColor = '#cc0' //palette[0];
 }
 
 function _redraw_term_force() {
@@ -3470,52 +3483,6 @@ function _redraw_term() {
 	}
 	zx = undefined; // break
 
-	if (!spelling && tospell > 0) {
-		spelling = true;
-		var xh = _xhttp();
-		osp=osp.substr(0,osp.length-1);
-		xh.open("GET", "spell.cgi?"+osp, true);
-		xh.onreadystatechange = function() {
-			if (xh.readyState == 4) {
-				var j;
-				var a = xh.responseText.split("\n");
-				for (j = 0; j < a.length; j++) {
-					var kp = a[j].split("=", 2);
-					var k, v;
-					if (kp.length == 2) {
-						k = kp[0];
-						v = kp[1];
-					} else if (kp.length == 1) {
-						k = kp[0];
-						v = '';
-					} else {
-						k = a[j];
-						v = '';
-					}
-					if (k.substr(0,1) != 'c') continue;
-					k = k.substr(1, k.length-1);
-					var term = spellcheck[k];
-					if (v == undefined || v == '') {
-						brokenwords[term] = true;
-						suggestions[term] = new Array();
-					} else if (v == term) {
-						safewords[term] = true;
-					} else {
-						safewords[v] = true;
-						if (!suggestions[term]) {
-							suggestions[term] = new Array();
-						}
-						suggestions[term][ suggestions[term].length ] = v;
-						brokenwords[term] = true;
-					}
-				}
-				spelling=false;
-				window.setTimeout(term_redraw,10);
-				xh = undefined; // break (deferred)
-			}
-		};
-		xh.send(undefined);
-	}
 	if (cursory == (h-1)) {
 		tools.style.display = 'none';
 	} else {
@@ -3628,6 +3595,9 @@ function editor(t) {
 		backing = document.createElement('TEXTAREA');
 		tools = document.createElement('DIV');
 		cursor = document.createElement('DIV');
+
+		//ACB
+		othercursors = document.createElement('DIV');
 	}
 
 //	if (document.documentElement) {
@@ -3639,6 +3609,8 @@ function editor(t) {
 
 	printer.className = 'print';
 	cursor.className = 'editorcursor';
+	//ACB
+	othercursors.className = 'editorcursor';
 	term.className = 'editor';
 
 	suggest.style.position = 'absolute';
@@ -3677,6 +3649,10 @@ function editor(t) {
 	cursor.onclick = _pass_click;
 	cursor.ondblclick = _pass_dblclick;
 
+	//ACB
+	othercursors.onclick = _pass_click;
+	othercursors.ondblclick = _pass_dblclick;
+
 	document.body.appendChild(suggest);
 	document.body.appendChild(term);
 	document.body.appendChild(printer);
@@ -3684,6 +3660,8 @@ function editor(t) {
 	// firefox bug
 	if (once) document.body.appendChild(backing);
 	document.body.appendChild(cursor);
+	//ACB
+	document.body.appendChild(othercursors);
 
 	cursoriv = window.setInterval(_redraw_cursor, 300);
 
@@ -3738,6 +3716,23 @@ function editor(t) {
 	cursor._lastgh = 0;
 	palette = undefined;
 
+	//ACB
+	othercursors.style.position = 'absolute';
+	othercursors.style.top = 0;
+	othercursors.style.left = 0;
+	othercursors.style.fontFamily = 'monospace';
+	othercursors.style.fontSize = '100%';
+	othercursors.style.width = 'auto';
+	othercursors.style.cursor = 'default';
+	_zmp(othercursors);
+	othercursors.style.overflow = 'hidden';
+	othercursors.innerHTML = 'X';
+	othercursors._opaque = false;
+	othercursors._lasty = -1;
+	othercursors._lastx = -1;
+	othercursors._lastch = '-xyz-';
+	othercursors._lastgh = 0;
+
 	if (document.defaultView && document.defaultView.getComputedStyle) {
 		palette = new Array();
 		var cs = document.defaultView.getComputedStyle(term, null);
@@ -3789,6 +3784,8 @@ function editor(t) {
 	_term_update_printer();
 
 	cursor.style.display = 'inline';
+	//ACB
+	othercursors.style.display = 'inline';
 	_cursor_fix();
 	window.setTimeout(term_redraw,1);
 	term_resize();
@@ -3796,4 +3793,124 @@ function editor(t) {
 	_cbw('resize', term_resize);
 	_cbw('beforeprint', _term_update_printer);
 	_update_backing();
+}
+
+function moveOtherCursor(curx, cury)
+{
+	//get new x/y
+	othercursors.style.left = (curx * (term_cur_width)) + 'px';
+
+	var gg = term.childNodes;
+	if (gg.length > cury) {
+		gg = term.childNodes[cury];
+	} else {
+		return;
+	}
+
+	var zx = gg
+	var nh = 0;
+	while (zx && zx != document.body) {
+		nh += zx.offsetTop;
+		zx = zx.offsetParent;
+	}
+	othercursors.style.top = nh + 'px';
+
+	var x = file[cury+base];
+	var z = x.substr(curx, 1);
+	if (cursorx >= x.length || z == undefined || z == "\240" || z == '')
+		z = ' ';
+	if (z == ' ') {
+		z = "\240";
+		q = 0;
+	}
+	while (othercursors.firstChild)
+		othercursors.removeChild(othercursors.firstChild);
+	othercursors.appendChild(document.createTextNode(z));
+
+	//file[0] += 'a'
+	term_redraw();
+}
+
+var updatehack;
+var last_x = -10;
+var last_y = -10;
+
+var othercursorx = 0
+var othercursory = 0
+
+var last_text = ''
+
+var firebaseref;
+
+var client_id;
+
+function randomString() {
+	var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz";
+	var string_length = 8;
+	var randomstring = '';
+	for (var i=0; i<string_length; i++) {
+		var rnum = Math.floor(Math.random() * chars.length);
+		randomstring += chars.substring(rnum,rnum+1);
+	}
+	return randomstring
+}
+
+function lookforupdate()
+{
+	if (last_x != cursorx || last_y != cursory ) {
+		//moveOtherCursor(cursorx, cursory)
+		last_x = cursorx
+		last_y = cursory
+		firebaseref.set({id:client_id, curx: cursorx, cury: cursory})
+		console.log('setting cursor')
+	}
+	text = ''
+	for( var i = 0; i < file.length; i++ ) {
+		if( i > 0 ) {
+			text += '\n'
+		}
+		text += file[i]
+	}
+	if( last_text != text ) {
+		//update text
+		last_text = text
+		firebaseref.set({id:client_id, data:text, curx: cursorx, cury: cursory})
+		console.log('sending data back')
+	}
+	window.setTimeout(lookforupdate, 300);
+}
+
+function alexhack()
+{
+	client_id = randomString()
+	firebaseref = new Firebase('https://gamma.firebase.com/alexcb/');
+	firebaseref.on('value', function(snapshot) {
+	  if(snapshot.val() === null) {
+		firebaseref.set({id:client_id, data:'test data'})
+	  } else {
+	console.log(snapshot.val())
+	    var id = snapshot.val().id
+	    var data = snapshot.val().data
+	    var ocurx = snapshot.val().curx
+	    var ocury = snapshot.val().cury
+		if( id != client_id && data ) {
+	    		//alert(data)
+			console.log('receiving data:'+data)
+			last_text = data
+			term_thaw(data)
+			term_redraw()
+		}
+		if( id != client_id && ocury !== undefined ) {
+			if( ocury < file.length ) {
+			othercursory = ocury
+			othercursorx = ocurx
+			}
+		}
+		moveOtherCursor(othercursorx, othercursory)
+	  }
+	});
+
+	editor(document.forms[0].elements.body);
+	lookforupdate()
+
 }
